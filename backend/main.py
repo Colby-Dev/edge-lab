@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import SessionLocal
+from sqlalchemy import text
 
 app = FastAPI(title="Edge Lab API")
 
