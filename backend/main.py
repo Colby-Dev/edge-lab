@@ -22,7 +22,6 @@ app.add_middleware(
 def health():
     return {"status": "ok"}
 
-
 @app.get("/db-test")
 def db_test():
     db = SessionLocal()
