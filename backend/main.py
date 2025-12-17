@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from database import SessionLocal
 
 app = FastAPI(title="Edge Lab API")
 
@@ -14,4 +15,11 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/db-test")
+def db_test():
+    db = SessionLocal()
+    result = db.execute("select 1").fetchone()
+    return {"db": result[0]}
 
