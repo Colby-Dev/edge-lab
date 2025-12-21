@@ -84,7 +84,7 @@ def get_probability(game_id: int, market: str, db: Session = Depends(get_db)):
 
     return results
 
-@app.get("/parlay/evaluate")
+@app.post("/parlay/evaluate")
 def evaluate_parlay(payload: ParlayRequest):
     legs = payload.legs
 
