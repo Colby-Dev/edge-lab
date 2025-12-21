@@ -7,4 +7,4 @@ class ParlayLeg(BaseModel):
     odds_decimal: float
 
 class ParlayRequest(BaseModel):
-    legs: List(ParlayLeg)
+    legs: List[ParlayLeg]
