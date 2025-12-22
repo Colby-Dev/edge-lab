@@ -126,3 +126,9 @@ def evaluate_parlay(payload: ParlayRequest):
         "risk_adjusted_return": risk_edj,
         "marginal_impacts": marginal_impacts
     }
+
+# @app.post("/parlay/optimize")
+# def optimize(payload: ParlayRequest):
+#     legs = [leg.model_dump() for leg in payload.legs]
+#     optimized = optimize_parlay(legs)
+#     return {"optimized_legs": optimized}
