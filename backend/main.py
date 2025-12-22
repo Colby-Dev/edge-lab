@@ -91,8 +91,8 @@ def evaluate_parlay(payload: ParlayRequest):
     if len(legs) < 1:
         return {"error": "Parlay must contain at least one leg"}
     
-    probs = [legs.probability for leg in legs]
-    odds = [legs.odds_decimal for leg in legs]
+    probs = [leg.probability for leg in legs]
+    odds = [leg.odds_decimal for leg in legs]
 
     total_prob = parlay_probability(probs)
     total_odds = parlay_odds(odds)
