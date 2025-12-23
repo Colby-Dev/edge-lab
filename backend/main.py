@@ -1,11 +1,15 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Header
 from database import SessionLocal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from deps import get_db
 from models import Odds
 from probability import implied_probability, remove_vig, expected_value
+from schemas import ParlayRequest
+from enum import Enum
+from optimizer import optimize_parlays
 from schemas import ParlayRequest
 from parlay import (
     parlay_probability,
@@ -15,6 +19,13 @@ from parlay import (
     parlay_variance,
     risk_adjusted_return
 )
+
+class UserTier(str, Enum):
+    FREE = "free"
+    PRO = "pro"
+
+def get_user_tier(x_user_tier: str = Header(default="free")) -> UserTier:
+    return UserTier(x_user_tier)
 
 app = FastAPI(title="Edge Lab API")
 
@@ -85,8 +96,13 @@ def get_probability(game_id: int, market: str, db: Session = Depends(get_db)):
     return results
 
 @app.post("/parlay/evaluate")
-def evaluate_parlay(payload: ParlayRequest):
+def evaluate_parlay(payload: ParlayRequest,
+                    tier: UserTier = Depends(get_user_tier)):
     legs = payload.legs
+    if tier == UserTier.FREE and len(legs) > 2:
+        return {
+            "Error": "Free tier allows max 2 legs. Upgrade for more."
+        }
 
     if len(legs) < 1:
         return {"error": "Parlay must contain at least one leg"}
@@ -117,14 +133,46 @@ def evaluate_parlay(payload: ParlayRequest):
             "marginal_ev": delta
         })
 
+    response = {
+        "basic_metrics":{
+
+            "legs": [leg.label for leg in legs],
+            "total_probability": total_prob,
+            "total_odds": total_odds,
+            "expected_value": ev,
+            "variance": variance,
+            "risk_adjusted_return": risk_edj,
+            "marginal_impacts": marginal_impacts
+        }
+    }
+
+    #Temporary hardcode
+    is_pro = False
+
+    if is_pro:
+        response["advanced_metrics"] = {
+            "kelly_fraction": 0.02,
+            "risk_of_ruin": 0.18,
+            "expected_drawdown": -0.35
+        }
+
+    return response
+    
+@app.post("/parlay/optimize")
+def optimize(payload: ParlayRequest):
+    legs = [
+        {
+            "label": leg.label,
+            "probability": leg.probability,
+            "odds_decimal": leg.odds_decimal
+        }
+        for leg in payload.legs
+    ]
+
+    suggestions = optimize_parlays(legs)
+
     return {
-        "legs": [leg.label for leg in legs],
-        "total_probability": total_prob,
-        "total_odds": total_odds,
-        "expected_value": ev,
-        "variance": variance,
-        "risk_adjusted_return": risk_edj,
-        "marginal_impacts": marginal_impacts
+        "suggestions": suggestions
     }
 
 # @app.post("/parlay/optimize")

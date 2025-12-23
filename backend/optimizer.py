@@ -1,62 +1,36 @@
+from itertools import combinations
 from typing import List
 from parlay import (
+    parlay_probability,
+    parlay_odds,
     parlay_expected_value,
-    risk_adjusted_return,
-    marginal_ev
+    risk_adjusted_return
 )
 
-def optimize_parlay(
-        legs: List[dict],
-        min_risk_adjusted: float = -0.05,
-        max_legs: int = 6
+
+def optimize_parlays(
+    legs: List[dict],
+    min_legs: int = 2,
+    max_legs: int = 4,
+    top_n: int = 5
 ):
-    selected = []
-    remaining = legs.copy()
+    results = []
 
-    remaining.sort(
-        key=lambda l: (l["probability"] * l["odds_decimal"]) - 1,
-        reverse=True
-    )
+    for r in range(min_legs, max_legs + 1):
+        for combo in combinations(legs, r):
+            probs = [leg["probability"] for leg in combo]
+            odds = [leg["odds_decimal"] for leg in combo]
 
-    if not remaining:
-        return selected
-    
-    selected.append(remaining.pop(0))
+            ev = parlay_expected_value(probs, odds)
+            rar = risk_adjusted_return(probs, odds)
 
-    while remaining and len(selected) < max_legs:
-        best_candidate = None
-        best_score = 0
+            results.append({
+                "legs": [leg["label"] for leg in combo],
+                "expected_value": ev,
+                "risk_adjusted_return": rar,
+                "leg_count": r
+            })
 
-        current_probs = [l["probability"] for l in selected]
-        current_odds = [l["odds_decimal"] for l in selected]
+    results.sort(key=lambda x: x["expected_value"], reverse=True)
 
-        current_risk_adj = risk_adjusted_return(current_probs, current_odds)
-
-        for leg in remaining:
-            delta_ev = marginal_ev(
-                current_probs,
-                current_odds,
-                leg["probability"],
-                leg["odds_decimal"]
-            )
-
-            new_risk_adj = risk_adjusted_return(
-                current_probs + [leg["probability"]],
-                current_odds + [leg["odds_decimal"]]
-            )
-
-            if delta_ev > 0 and new_risk_adj >= min_risk_adjusted:
-                score = delta_ev + new_risk_adj
-
-                if score > best_score:
-                    best_score = score
-                    best_candidate = leg
-            
-        if best_candidate:
-            selected.append(best_candidate)
-            remaining.remove(best_candidate)
-        
-        else: 
-            break
-        
-    return selected
+    return results[:top_n]
