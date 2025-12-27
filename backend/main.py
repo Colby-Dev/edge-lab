@@ -10,7 +10,7 @@ from probability import implied_probability, remove_vig, expected_value
 from schemas import ParlayRequest
 from enum import Enum
 from optimizer import optimize_parlays
-from schemas import ParlayRequest
+from schemas import ParlayRequest, SaveParlayRequest
 from parlay import (
     parlay_probability,
     parlay_odds,
@@ -26,6 +26,10 @@ class UserTier(str, Enum):
 
 def get_user_tier(x_user_tier: str = Header(default="free")) -> UserTier:
     return UserTier(x_user_tier)
+
+def get_current_user_id():
+    # TEMP: replace with Supabase auth later
+    return "00000000-0000-0000-0000-000000000000"
 
 app = FastAPI(title="Edge Lab API")
 
@@ -96,65 +100,49 @@ def get_probability(game_id: int, market: str, db: Session = Depends(get_db)):
     return results
 
 @app.post("/parlay/evaluate")
-def evaluate_parlay(payload: ParlayRequest,
-                    tier: UserTier = Depends(get_user_tier)):
+def evaluate_parlay(payload: ParlayRequest):
     legs = payload.legs
-    if tier == UserTier.FREE and len(legs) > 2:
-        return {
-            "Error": "Free tier allows max 2 legs. Upgrade for more."
-        }
 
     if len(legs) < 1:
         return {"error": "Parlay must contain at least one leg"}
-    
+
+    # ---- BASIC METRICS (FREE TIER) ----
     probs = [leg.probability for leg in legs]
     odds = [leg.odds_decimal for leg in legs]
 
     total_prob = parlay_probability(probs)
     total_odds = parlay_odds(odds)
     ev = parlay_expected_value(probs, odds)
-    variance = parlay_variance(probs, odds)
-    risk_edj = risk_adjusted_return(probs, odds)
-
-    marginal_impacts = []
-    for i, leg in enumerate(legs):
-        remaining_probs = probs[:i] + probs[i+1:]
-        remaining_odds = odds[:i] + odds[i+1:]
-
-        delta = marginal_ev(
-            remaining_probs,
-            remaining_odds,
-            leg.probability,
-            leg.odds_decimal
-        )
-
-        marginal_impacts.append({
-            "label": leg.label,
-            "marginal_ev": delta
-        })
 
     response = {
-        "basic_metrics":{
-
-            "legs": [leg.label for leg in legs],
-            "total_probability": total_prob,
-            "total_odds": total_odds,
-            "expected_value": ev,
-            "variance": variance,
-            "risk_adjusted_return": risk_edj,
-            "marginal_impacts": marginal_impacts
-        }
+        "leg_count": len(legs),
+        "legs": [leg.label for leg in legs],
+        "total_probability": total_prob,
+        "total_odds": total_odds,
+        "expected_value": ev
     }
 
-    #Temporary hardcode
-    is_pro = False
+    # ---- FEATURE GATING (Phase 4A.4) ----
+    # TEMP: hardcode user tier
+    user_tier = "free"  # later: derive from profiles table
 
-    if is_pro:
-        response["advanced_metrics"] = {
-            "kelly_fraction": 0.02,
-            "risk_of_ruin": 0.18,
-            "expected_drawdown": -0.35
-        }
+    if user_tier == "paid":
+        response.update({
+            "variance": parlay_variance(probs, odds),
+            "risk_adjusted_return": risk_adjusted_return(probs, odds),
+            "marginal_impacts": [
+                {
+                    "label": leg.label,
+                    "marginal_ev": marginal_ev(
+                        probs[:i] + probs[i+1:],
+                        odds[:i] + odds[i+1:],
+                        leg.probability,
+                        leg.odds_decimal
+                    )
+                }
+                for i, leg in enumerate(legs)
+            ]
+        })
 
     return response
     
@@ -174,6 +162,48 @@ def optimize(payload: ParlayRequest):
     return {
         "suggestions": suggestions
     }
+
+@app.post("/parlay/save")
+def save_parlay(payload: SaveParlayRequest, db = Depends(get_db)):
+
+    user_id = get_current_user_id()
+
+    db.execute(
+        text("""
+            insert into saved_parlays
+            (user_id, legs, total_probability, total_odds, expected_value, risk_adjusted_return)
+            values
+            (:user_id, :legs, :tp, :to, :ev, :rar)
+        """),
+        {
+            "user_id": user_id,
+            "legs": payload.legs,
+            "tp": payload.total_probability,
+            "to": payload.total_odds,
+            "ev": payload.expected_value,
+            "rar": payload.risk_adjusted_return
+        }
+    )
+
+    db.commit()
+
+    return {"status": "saved"}
+
+@app.get("/parlay/history")
+def parlay_history(db = Depends(get_db)):
+    user_id = get_current_user_id()
+
+    rows = db.execute(
+        text("""
+            select *
+            from saved_parlays
+            where user_id = :user_id
+            order by created_at desc
+        """),
+        {"user_id": user_id}
+    ).fetchall()
+
+    return [dict(row) for row in rows]
 
 # @app.post("/parlay/optimize")
 # def optimize(payload: ParlayRequest):
