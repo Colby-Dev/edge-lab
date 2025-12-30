@@ -5,6 +5,24 @@ from parlay import (
     marginal_ev
 )
 
+def implied_probability(decimal_odds: float) -> float:
+    return 1.0 / decimal_odds
+
+
+def edge_percentage(fair_prob: float, decimal_odds: float) -> float:
+    implied = implied_probability(decimal_odds)
+    return fair_prob - implied
+
+
+def edge_strength(edge: float) -> str:
+    if edge > 0.05:
+        return "strong"
+    if edge > 0.02:
+        return "medium"
+    if edge > 0:
+        return "weak"
+    return "negative"
+
 
 def is_positive_ev(prob: float, odds: float) -> bool:
     return (prob * odds) - 1 > 0

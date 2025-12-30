@@ -1,6 +1,9 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Numeric, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, Numeric, DateTime, Float
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+
 
 Base = declarative_base()
 
@@ -31,3 +34,13 @@ class Odds(Base):
     outcome = Column(String, nullable=False)
     odds_decimal = Column(Numeric, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Parlay(Base):
+    __tablename__ = "parlays"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
+    legs = Column(String)  # JSON string
+    expected_value = Column(Float)
+    risk_adjusted_return = Column(Float)
+    created_at = Column(DateTime, server_default=func.now())

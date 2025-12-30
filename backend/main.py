@@ -19,6 +19,10 @@ from parlay import (
     parlay_variance,
     risk_adjusted_return
 )
+from parlay_history import get_user_parlays
+from performance import roi
+from auth import get_current_user
+
 
 class UserTier(str, Enum):
     FREE = "free"
@@ -204,6 +208,25 @@ def parlay_history(db = Depends(get_db)):
     ).fetchall()
 
     return [dict(row) for row in rows]
+
+@app.get("/user/performance")
+def user_performance(
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    parlays = get_user_parlays(db, user.id)
+
+    total_stake = sum(p.stake for p in parlays)
+    total_return = sum(p.payout for p in parlays)
+    total_expected = sum(p.expected_return for p in parlays)
+
+    return {
+        "roi": roi(total_stake, total_return),
+        "expected_vs_actual": total_return - total_expected,
+        "edge_capture": sum(p.expected_value for p in parlays) / max(len(parlays), 1),
+        "parlay_count": len(parlays)
+    }
+
 
 # @app.post("/parlay/optimize")
 # def optimize(payload: ParlayRequest):
