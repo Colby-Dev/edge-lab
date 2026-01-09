@@ -22,6 +22,7 @@ from parlay import (
 from parlay_history import get_user_parlays
 from performance import roi
 from auth import get_current_user
+import os
 
 
 class UserTier(str, Enum):
@@ -259,6 +260,9 @@ def user_performance(
 def whoami(user: dict = Depends(get_current_user)):
     return user
 
+@app.get("/debug/env")
+def debug_env():
+    return {"has_jwt_secret": bool (os.environ.get("SUPABASE_JWT_SECRET"))}
 
 # @app.post("/parlay/optimize")
 # def optimize(payload: ParlayRequest):
