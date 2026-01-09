@@ -19,7 +19,8 @@ def get_current_user(authorization: str = Header(None)):
            token,
            SUPABASE_JWT_SECRET,
            algorithms=["HS256"],
-           audience="authenticated",
+           options={"verify_aud": False},
+        #    audience="authenticated",
        )
        return {"user_id": payload.get("sub")}
     except JWTError:
