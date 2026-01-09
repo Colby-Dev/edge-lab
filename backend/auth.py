@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from fastapi import Depends, HTTPException, Header
+from jose import JWTError
 import jwt
 import os
 
@@ -10,28 +11,32 @@ def get_current_user(authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing auth header")
 
+    if not SUPABASE_JWT_SECRET:
+        raise HTTPException(status_code=500, detail="SUPABASE_JWT_SECRET not set")
+
+    token = authorization.split(" ", 1)[1]
     try:
-        scheme, token = authorization.split()
-        payload = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            audience="authenticated"
-        )
-        return payload  # contains sub = user_id
-    except Exception:
+       payload = jwt.decode(
+           token,
+           SUPABASE_JWT_SECRET,
+           algorithms=["HS256"],
+           audience="authenticated",
+       )
+       return {"user_id": payload.get("sub")}
+    except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def get_user_plan(db: Session, user_id: str) -> str:
-    result = db.execute(
-        text("SELECT plan FROM profiles WHERE id = :uid"),
-        {"uid": user_id}
-    ).fetchone()
+#Added user_repo helper file
+# def get_user_plan(db: Session, user_id: str) -> str:
+#     result = db.execute(
+#         text("SELECT plan FROM profiles WHERE id = :uid"),
+#         {"uid": user_id}
+#     ).fetchone()
 
-    if not result:
-        return "free"
+#     if not result:
+#         return "free"
 
-    return result[0]
+#     return result[0]
 
 def increment_api_usage(db: Session, user_id: str):
     db.execute(

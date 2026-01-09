@@ -104,51 +104,79 @@ def get_probability(game_id: int, market: str, db: Session = Depends(get_db)):
     return results
 
 @app.post("/parlay/evaluate")
-def evaluate_parlay(payload: ParlayRequest):
-    legs = payload.legs
+def evaluate_parlay(
+    payload: ParlayRequest, 
+    db: Session = Depends(get_db), 
+    user = (get_current_user),
+    ):
+        user_id = user["user_id"]
+        tier = get_user_tier(db, user_id)
+    
+        legs = payload.legs
 
-    if len(legs) < 1:
-        return {"error": "Parlay must contain at least one leg"}
+        if len(legs) < 1:
+            return {"error": "Parlay must contain at least one leg"}
 
-    # ---- BASIC METRICS (FREE TIER) ----
-    probs = [leg.probability for leg in legs]
-    odds = [leg.odds_decimal for leg in legs]
+        # ---- BASIC METRICS (FREE TIER) ----
+        probs = [leg.probability for leg in legs]
+        odds = [leg.odds_decimal for leg in legs]
 
-    total_prob = parlay_probability(probs)
-    total_odds = parlay_odds(odds)
-    ev = parlay_expected_value(probs, odds)
+        total_prob = parlay_probability(probs)
+        total_odds = parlay_odds(odds)
+        ev = parlay_expected_value(probs, odds)
 
-    response = {
-        "leg_count": len(legs),
-        "legs": [leg.label for leg in legs],
-        "total_probability": total_prob,
-        "total_odds": total_odds,
-        "expected_value": ev
-    }
+        response = {
+            "leg_count": len(legs),
+            "legs": [leg.label for leg in legs],
+            "total_probability": total_prob,
+            "total_odds": total_odds,
+            "expected_value": ev
+        }
 
-    # ---- FEATURE GATING (Phase 4A.4) ----
+        #----- Adv Tier -----
+        if tier in ("pro", "premium"):
+            response.update({
+                "variance": parlay_variance(probs, odds),
+                "risk_adjusted_return": risk_adjusted_return(probs, odds),
+                "marginal_impacts":[
+                    {
+                        "label": leg.label,
+                        "marginal_ev": marginal_ev(
+                            probs[:i] + probs[i+1],
+                            odds[:i] + odds[i+1:],
+                            leg.probability,
+                            leg.odds_decimal
+                        )
+                        
+                    }
+                    for i, leg in enumerate(legs)
+                ]
+            })
+
+        return response
+
     # TEMP: hardcode user tier
-    user_tier = "free"  # later: derive from profiles table
+    # user_tier = "free"  # later: derive from profiles table
 
-    if user_tier == "paid":
-        response.update({
-            "variance": parlay_variance(probs, odds),
-            "risk_adjusted_return": risk_adjusted_return(probs, odds),
-            "marginal_impacts": [
-                {
-                    "label": leg.label,
-                    "marginal_ev": marginal_ev(
-                        probs[:i] + probs[i+1:],
-                        odds[:i] + odds[i+1:],
-                        leg.probability,
-                        leg.odds_decimal
-                    )
-                }
-                for i, leg in enumerate(legs)
-            ]
-        })
+    # if user_tier == "paid":
+    #     response.update({
+    #         "variance": parlay_variance(probs, odds),
+    #         "risk_adjusted_return": risk_adjusted_return(probs, odds),
+    #         "marginal_impacts": [
+    #             {
+    #                 "label": leg.label,
+    #                 "marginal_ev": marginal_ev(
+    #                     probs[:i] + probs[i+1:],
+    #                     odds[:i] + odds[i+1:],
+    #                     leg.probability,
+    #                     leg.odds_decimal
+    #                 )
+    #             }
+    #             for i, leg in enumerate(legs)
+    #         ]
+    #     })
 
-    return response
+    # return response
     
 @app.post("/parlay/optimize")
 def optimize(payload: ParlayRequest):
