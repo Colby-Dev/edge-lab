@@ -1,8 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from fastapi import Depends, HTTPException, Header
-from jose import JWTError
-import jwt
+from jose import jwt, JWTError
 import os
 
 SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET")
