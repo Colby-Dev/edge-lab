@@ -257,8 +257,8 @@ def user_performance(
     }
 
 @app.get("/debug/whoami")
-def whoami(user: dict = Depends(get_current_user)):
-    return user
+def whoami(payload: dict = Depends(get_current_user)):
+    return payload
 
 @app.get("/debug/env")
 def debug_env():
