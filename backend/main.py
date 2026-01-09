@@ -107,7 +107,7 @@ def get_probability(game_id: int, market: str, db: Session = Depends(get_db)):
 def evaluate_parlay(
     payload: ParlayRequest, 
     db: Session = Depends(get_db), 
-    user = (get_current_user),
+    user: dict =Depends(get_current_user),
     ):
         user_id = user["user_id"]
         tier = get_user_tier(db, user_id)
@@ -254,6 +254,10 @@ def user_performance(
         "edge_capture": sum(p.expected_value for p in parlays) / max(len(parlays), 1),
         "parlay_count": len(parlays)
     }
+
+@app.get("/debug/whoami")
+def whoami(user: dict = Depends(get_current_user)):
+    return user
 
 
 # @app.post("/parlay/optimize")
