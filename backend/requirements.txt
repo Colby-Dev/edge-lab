@@ -15,7 +15,7 @@ fastapi_cors==0.0.6
 h11==0.16.0
 humanize==4.4.0
 idna==3.4
-python-jose==3.30
+python-jose==3.3.0
 jwt==1.4.0
 keyboard==0.13.5
 marshmallow==4.1.1
