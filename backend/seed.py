@@ -16,7 +16,7 @@ game = Game(
     sport="NBA",
     home_team="Lakers",
     away_team="Celtics",
-    start_time=datetime.utcnow()
+    start_time=datetime.now()
 )
 
 db.add(game)
